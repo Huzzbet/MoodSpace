@@ -1,84 +1,41 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MoodSpace 🌐</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MoodSpace 🌐 — Pro</title>
+
+  <!-- Tailwind CSS (CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
   <style>
-    body {
-      margin: 0;
-      font-family: 'Segoe UI', sans-serif;
-      background: #f2f2f2;
-      color: #333;
-    }
-
-    #app {
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 1em;
-      text-align: center;
-    }
-
-    form {
-      display: flex;
-      flex-direction: column;
-      gap: 1em;
-      margin-bottom: 1em;
-      background: #fff;
-      padding: 1em;
-      border-radius: 10px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
-
-    form label {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      font-weight: bold;
-    }
-
-    form input[type="text"], form select {
-      padding: 0.5em;
-      width: 100%;
-      border-radius: 5px;
-      border: 1px solid #ccc;
-    }
-
-    form button {
-      padding: 0.7em;
-      background: #007BFF;
-      color: #fff;
-      font-weight: bold;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background 0.3s;
-    }
-
-    form button:hover {
-      background: #0056b3;
-    }
-
     #map {
-      height: 500px;
-      border-radius: 10px;
-      overflow: hidden;
+      height: 600px;
+      border-radius: 0.75rem;
     }
   </style>
 </head>
-<body>
-  <div id="app">
-    <h1>MoodSpace 🌐</h1>
 
-    <form id="moodForm">
-      <label>
-        Mood Color:
-        <input type="color" id="moodColor" value="#ffcc00" />
-      </label>
-      <label>
-        Emoji:
-        <select id="moodEmoji">
+<body class="bg-slate-100 text-slate-800">
+
+  <div class="max-w-4xl mx-auto p-6">
+    <h1 class="text-3xl font-bold text-center mb-6">MoodSpace 🌐 — Share Your Mood</h1>
+
+    <!-- Mood Form -->
+    <form id="moodForm" class="bg-white p-6 rounded-xl shadow-md space-y-4">
+      <div>
+        <label class="block font-semibold">Mood Color</label>
+        <input type="color" id="moodColor" value="#ffcc00" class="w-20 h-10 p-0 border-none" />
+      </div>
+
+      <div>
+        <label class="block font-semibold">Emoji</label>
+        <select id="moodEmoji"
+          class="w-full border border-slate-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
           <option>😄</option>
           <option>😌</option>
           <option>😢</option>
@@ -86,45 +43,114 @@
           <option>😴</option>
           <option>🤯</option>
         </select>
-      </label>
-      <label>
-        One-word Tag:
-        <input type="text" id="moodTag" placeholder="e.g. 'grateful'" maxlength="20" />
-      </label>
-      <button type="submit">Share Mood</button>
+      </div>
+
+      <div>
+        <label class="block font-semibold">One-word Tag</label>
+        <input type="text" id="moodTag" placeholder="e.g. grateful"
+          class="w-full border border-slate-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+      </div>
+
+      <button type="submit"
+        class="w-full bg-blue-600 text-white font-bold px-4 py-2 rounded hover:bg-blue-700 transition">
+        Share Mood
+      </button>
     </form>
 
-    <div id="map"></div>
+    <!-- Map -->
+    <div id="map" class="mt-6 shadow-lg"></div>
+
   </div>
 
+  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
   <script>
-    const map = L.map('map').setView([20, 0], 2); // global view
+    // ---------------------------
+    // 🔑 FIREBASE CONFIG — REPLACE WITH YOURS
+    // ---------------------------
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // ---------------------------
+    // 🌍 MAP SETUP
+    // ---------------------------
+    const map = L.map('map').setView([20, 0], 2);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    document.getElementById('moodForm').addEventListener('submit', function (e) {
+    // Load existing moods from Firestore
+    db.collection("moods").get().then((querySnapshot) => {
+      querySnapshot.forEach((doc) => {
+        const m = doc.data();
+        const moodIcon = L.divIcon({
+          className: 'mood-pin',
+          html: `<div style="font-size:1.6em; background:${m.color}; border-radius:50%; width:2em; height:2em; display:flex; justify-content:center; align-items:center;">${m.emoji}</div>`
+        });
+        L.marker([m.lat, m.lng], { icon: moodIcon })
+          .addTo(map).bindPopup(`<strong>${m.tag}</strong>`);
+      });
+    });
+
+    // ---------------------------
+    // 📍 FORM HANDLER
+    // ---------------------------
+    document.getElementById('moodForm').addEventListener('submit', async (e) => {
       e.preventDefault();
 
       const color = document.getElementById('moodColor').value;
       const emoji = document.getElementById('moodEmoji').value;
       const tag = document.getElementById('moodTag').value.trim();
 
-      // Simulated location (randomized globally)
-      const lat = 20 + (Math.random() - 0.5) * 60;
-      const lng = 0 + (Math.random() - 0.5) * 120;
+      if (!tag) {
+        alert("Please enter a one-word tag!");
+        return;
+      }
 
-      const moodIcon = L.divIcon({
-        className: 'mood-pin',
-        html: \`<div style="font-size: 1.5em; background:\${color}; border-radius:50%; width:2em; height:2em; display:flex; align-items:center; justify-content:center;">\${emoji}</div>\`
+      // 🧭 Get real user location
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+
+        // Save to Firestore
+        await db.collection("moods").add({
+          color, emoji, tag, lat, lng, timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Add marker to map
+        const moodIcon = L.divIcon({
+          className: 'mood-pin',
+          html: `<div style="font-size:1.6em; background:${color}; border-radius:50%; width:2em; height:2em; display:flex; justify-content:center; align-items:center;">${emoji}</div>`
+        });
+
+        L.marker([lat, lng], { icon: moodIcon })
+          .addTo(map).bindPopup(`<strong>${tag}</strong>`);
+
+        document.getElementById('moodTag').value = "";
+
+      }, () => {
+        alert("Unable to access location 😕");
       });
 
-      L.marker([lat, lng], { icon: moodIcon }).addTo(map).bindPopup(\`<strong>\${tag}</strong>\`);
-
-      document.getElementById('moodTag').value = '';
     });
   </script>
+
 </body>
+
 </html>
