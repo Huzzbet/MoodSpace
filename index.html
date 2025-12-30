@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MoodSpace 🌐</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: #f2f2f2;
+      color: #333;
+    }
+
+    #app {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 1em;
+      text-align: center;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 1em;
+      margin-bottom: 1em;
+      background: #fff;
+      padding: 1em;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+
+    form label {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      font-weight: bold;
+    }
+
+    form input[type="text"], form select {
+      padding: 0.5em;
+      width: 100%;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+
+    form button {
+      padding: 0.7em;
+      background: #007BFF;
+      color: #fff;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    form button:hover {
+      background: #0056b3;
+    }
+
+    #map {
+      height: 500px;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <h1>MoodSpace 🌐</h1>
+
+    <form id="moodForm">
+      <label>
+        Mood Color:
+        <input type="color" id="moodColor" value="#ffcc00" />
+      </label>
+      <label>
+        Emoji:
+        <select id="moodEmoji">
+          <option>😄</option>
+          <option>😌</option>
+          <option>😢</option>
+          <option>😠</option>
+          <option>😴</option>
+          <option>🤯</option>
+        </select>
+      </label>
+      <label>
+        One-word Tag:
+        <input type="text" id="moodTag" placeholder="e.g. 'grateful'" maxlength="20" />
+      </label>
+      <button type="submit">Share Mood</button>
+    </form>
+
+    <div id="map"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([20, 0], 2); // global view
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    document.getElementById('moodForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      const color = document.getElementById('moodColor').value;
+      const emoji = document.getElementById('moodEmoji').value;
+      const tag = document.getElementById('moodTag').value.trim();
+
+      // Simulated location (randomized globally)
+      const lat = 20 + (Math.random() - 0.5) * 60;
+      const lng = 0 + (Math.random() - 0.5) * 120;
+
+      const moodIcon = L.divIcon({
+        className: 'mood-pin',
+        html: \`<div style="font-size: 1.5em; background:\${color}; border-radius:50%; width:2em; height:2em; display:flex; align-items:center; justify-content:center;">\${emoji}</div>\`
+      });
+
+      L.marker([lat, lng], { icon: moodIcon }).addTo(map).bindPopup(\`<strong>\${tag}</strong>\`);
+
+      document.getElementById('moodTag').value = '';
+    });
+  </script>
+</body>
+</html>
