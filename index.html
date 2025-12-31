@@ -5,18 +5,14 @@
   <title>MoodSpace 🌍</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- PWA -->
-  <link rel="manifest" href="manifest.json" />
+  <!-- Theme -->
   <meta name="theme-color" content="#020617"/>
 
   <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Leaflet -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <style>
@@ -24,65 +20,56 @@
       height: 420px;
       border-radius: 18px;
       overflow: hidden;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+      box-shadow: 0 12px 30px rgba(0,0,0,0.45);
     }
 
-    /* Satellite dark overlay for calm */
     .map-overlay {
-      position: absolute;
-      inset: 0;
-      background: rgba(2, 6, 23, 0.35);
-      pointer-events: none;
-      z-index: 400;
+      position:absolute;
+      inset:0;
+      background:rgba(2,6,23,0.35);
+      pointer-events:none;
+      z-index:400;
     }
 
-    /* Pulse marker */
     .pulse {
-      background: rgba(129, 140, 248, 1);
-      border-radius: 50%;
-      width: 14px;
-      height: 14px;
-      position: relative;
-      box-shadow: 0 0 12px rgba(129, 140, 248, 0.9);
-    }
-    .pulse::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      border-radius: 50%;
-      animation: pulse 2.2s infinite;
-      background: rgba(129, 140, 248, 0.5);
-    }
-    @keyframes pulse {
-      0% { transform: scale(1); opacity: 1; }
-      100% { transform: scale(3); opacity: 0; }
+      width:14px;
+      height:14px;
+      border-radius:50%;
+      background:#818cf8;
+      box-shadow:0 0 14px rgba(129,140,248,0.9);
+      position:relative;
     }
 
-    .mood-btn {
-      background: rgba(99, 102, 241, 0.15);
-      border: 1px solid rgba(129, 140, 248, 0.25);
-      transition: all 0.2s ease;
+    .pulse::after {
+      content:'';
+      position:absolute;
+      inset:0;
+      border-radius:50%;
+      animation:pulse 2.5s infinite;
+      background:rgba(129,140,248,0.6);
     }
-    .mood-btn:hover {
-      background: rgba(99, 102, 241, 0.3);
-      box-shadow: 0 0 12px rgba(99, 102, 241, 0.6);
+
+    @keyframes pulse {
+      from { transform:scale(1); opacity:1 }
+      to   { transform:scale(3); opacity:0 }
     }
   </style>
 </head>
 
-<body class="bg-slate-900 text-slate-100">
+<body class="bg-slate-900 text-slate-100 transition">
 
 <div class="max-w-5xl mx-auto p-4 space-y-6">
 
   <!-- Header -->
   <header class="text-center space-y-1">
-    <h1 class="text-3xl font-semibold tracking-tight">
-      MoodSpace 🌍
-    </h1>
-    <p class="text-slate-400 text-sm">
-      Arrive. Reflect. Record.
-    </p>
+    <h1 class="text-3xl font-semibold tracking-tight">MoodSpace 🌍</h1>
+    <p class="text-slate-400 text-sm">Arrive. Reflect. Record.</p>
   </header>
+
+  <!-- Streak -->
+  <div class="text-center text-sm text-indigo-400">
+    🔥 <span id="streak">0</span> day check-in streak
+  </div>
 
   <!-- Map -->
   <div class="relative">
@@ -91,70 +78,164 @@
   </div>
 
   <!-- Mood Panel -->
-  <div id="moodPanel" class="hidden bg-slate-800 rounded-2xl shadow-xl p-5 space-y-4">
+  <div id="panel" class="hidden bg-slate-800 rounded-2xl p-5 space-y-4 shadow-xl">
+
     <h2 class="text-lg font-medium">How do you feel here?</h2>
 
     <div class="flex gap-2 flex-wrap">
-      <button class="mood-btn px-4 py-2 rounded-xl">😊 Calm</button>
-      <button class="mood-btn px-4 py-2 rounded-xl">😔 Heavy</button>
-      <button class="mood-btn px-4 py-2 rounded-xl">⚡ Energised</button>
-      <button class="mood-btn px-4 py-2 rounded-xl">😌 Grateful</button>
+      <button onclick="selectMood('Calm')" class="px-4 py-2 rounded-xl bg-indigo-500/20">😊 Calm</button>
+      <button onclick="selectMood('Heavy')" class="px-4 py-2 rounded-xl bg-purple-500/20">😔 Heavy</button>
+      <button onclick="selectMood('Energised')" class="px-4 py-2 rounded-xl bg-yellow-400/20">⚡ Energised</button>
     </div>
 
+    <p id="prompt" class="text-sm text-slate-300 italic"></p>
+
     <textarea
+      id="note"
       placeholder="Optional reflection…"
       class="w-full p-3 rounded-xl bg-slate-900 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
       rows="3"
     ></textarea>
 
-    <button class="w-full bg-indigo-600 hover:bg-indigo-500 transition py-3 rounded-xl font-medium">
-      Save Mood
-    </button>
+    <div class="flex gap-2">
+      <button onclick="saveMood()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 transition py-3 rounded-xl font-medium">
+        Save Mood
+      </button>
+      <button onclick="returnToLast()" class="px-4 py-3 bg-slate-700 rounded-xl">
+        ⏪
+      </button>
+    </div>
+
   </div>
 
 </div>
 
 <script>
-  // Map init (start global)
-  const map = L.map('map', {
-    zoomControl: false,
-    attributionControl: false
-  }).setView([20, 0], 2);
+/* 🌍 MAP INIT */
+const map = L.map('map', {
+  zoomControl:false,
+  attributionControl:false
+}).setView([20, 0], 2);
 
-  // Satellite tiles (colour)
-  L.tileLayer(
-    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    { maxZoom: 18 }
-  ).addTo(map);
+/* 🛰️ SATELLITE TILES */
+L.tileLayer(
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  { maxZoom:18 }
+).addTo(map);
 
-  const pulseIcon = L.divIcon({
-    className: '',
-    html: '<div class="pulse"></div>',
-    iconSize: [14, 14]
+const pulseIcon = L.divIcon({
+  className:'',
+  html:'<div class="pulse"></div>',
+  iconSize:[14,14]
+});
+
+/* 📍 STATE */
+let current = {};
+let moods = JSON.parse(localStorage.getItem('moods') || '[]');
+
+/* 🎥 CINEMATIC ARRIVAL */
+function arrive(lat, lng) {
+  current.lat = lat;
+  current.lng = lng;
+
+  // Long descent
+  map.flyTo([lat, lng], 15, {
+    animate: true,
+    duration: 2.8,
+    easeLinearity: 0.18
   });
 
-  function arrive(lat, lng) {
+  // Gentle settle
+  setTimeout(() => {
     map.flyTo([lat, lng], 14, {
       animate: true,
-      duration: 1.3,
-      easeLinearity: 0.25
+      duration: 0.6,
+      easeLinearity: 0.3
     });
+  }, 2800);
 
+  // Pin drop
+  setTimeout(() => {
+    L.marker([lat, lng], { icon: pulseIcon }).addTo(map);
+
+    // UI reveal after a beat
     setTimeout(() => {
-      L.marker([lat, lng], { icon: pulseIcon }).addTo(map);
-      document.getElementById('moodPanel').classList.remove('hidden');
-    }, 1300);
-  }
+      document.getElementById('panel').classList.remove('hidden');
+      renderHeatmap();
+    }, 300);
 
-  // Geolocation
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      pos => arrive(pos.coords.latitude, pos.coords.longitude),
-      () => arrive(-28.0167, 153.4000) // Gold Coast fallback
-    );
-  } else {
-    arrive(-28.0167, 153.4000);
+  }, 3400);
+}
+
+/* 📡 GEOLOCATION */
+navigator.geolocation?.getCurrentPosition(
+  p => arrive(p.coords.latitude, p.coords.longitude),
+  () => arrive(-28.0167, 153.4000) // Gold Coast fallback
+);
+
+/* 😊 MOOD */
+function selectMood(mood) {
+  current.mood = mood;
+  const prompts = {
+    Calm: "What’s creating calm for you in this moment?",
+    Heavy: "What feels heavy — and what might help lighten it?",
+    Energised: "Where is this energy coming from?"
+  };
+  document.getElementById('prompt').innerText = prompts[mood];
+}
+
+/* 💾 SAVE */
+function saveMood() {
+  if (!current.mood) return alert("Please select a mood");
+
+  const entry = {
+    ...current,
+    note: note.value,
+    date: new Date().toDateString()
+  };
+
+  moods.push(entry);
+  localStorage.setItem('moods', JSON.stringify(moods));
+  updateStreak();
+  alert("Mood saved 🌱");
+}
+
+/* 🔥 STREAK */
+function updateStreak() {
+  const uniqueDates = [...new Set(moods.map(m => m.date))];
+  let streak = 0;
+
+  for (let i = uniqueDates.length - 1; i >= 0; i--) {
+    const diff = (Date.now() - new Date(uniqueDates[i])) / 86400000;
+    if (diff <= streak + 1) streak++;
+    else break;
   }
+  document.getElementById('streak').innerText = streak;
+}
+updateStreak();
+
+/* 🔥 HEATMAP */
+function renderHeatmap() {
+  moods.forEach(m => {
+    const color =
+      m.mood === 'Calm' ? '#60a5fa' :
+      m.mood === 'Energised' ? '#fde047' :
+      '#c084fc';
+
+    L.circle([m.lat, m.lng], {
+      radius: 40,
+      color,
+      fillOpacity: 0.6
+    }).addTo(map);
+  });
+}
+
+/* ⏪ RETURN */
+function returnToLast() {
+  if (!moods.length) return;
+  const last = moods[moods.length - 1];
+  map.flyTo([last.lat, last.lng], 14, { duration: 1 });
+}
 </script>
 
 </body>
