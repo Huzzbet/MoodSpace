@@ -2,159 +2,316 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>MoodSpace 🌍</title>
+  <title>MoodSpace 🌍 PWA</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+  <!-- PWA Meta -->
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#0f172a"/>
 
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
   <style>
     #map { height: 450px; }
+    .glass {
+      background: rgba(255,255,255,0.75);
+      backdrop-filter: blur(10px);
+    }
   </style>
 </head>
 
 <body class="bg-slate-100 text-slate-900">
 
-<div class="max-w-5xl mx-auto p-4 space-y-6">
+  <div class="max-w-5xl mx-auto p-4 space-y-6">
 
-  <!-- Header -->
-  <header class="text-center space-y-2">
-    <h1 class="text-3xl font-bold">MoodSpace 🌍</h1>
-    <p class="text-slate-600">
-      A real-time map of how the world feels
-    </p>
-    <p id="worldMood" class="font-semibold text-lg"></p>
-  </header>
+    <!-- Header -->
+    <header class="text-center space-y-2">
+      <h1 class="text-3xl font-bold">MoodSpace 🌍</h1>
+      <p class="text-slate-600">
+        A real-time map of how the world feels
+      </p>
 
-  <!-- Mood Picker -->
-  <section class="bg-white rounded-xl shadow p-6 text-center">
-    <h2 class="text-xl font-semibold mb-4">
-      How are you feeling right now?
-    </h2>
-
-    <div class="flex flex-wrap justify-center gap-4">
-      <button onclick="logMood('calm')" class="text-3xl">😌</button>
-      <button onclick="logMood('happy')" class="text-3xl">😊</button>
-      <button onclick="logMood('focused')" class="text-3xl">🎯</button>
-      <button onclick="logMood('tired')" class="text-3xl">😴</button>
-      <button onclick="logMood('sad')" class="text-3xl">😔</button>
-      <button onclick="logMood('angry')" class="text-3xl">😡</button>
-    </div>
-  </section>
-
-  <!-- Map -->
-  <div id="map" class="rounded-xl shadow"></div>
-
-</div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<script>
-/* =========================
-   MOOD DEFINITIONS
-========================= */
-const MOODS = {
-  calm:   { emoji: "😌", color: "#38bdf8" },
-  happy:  { emoji: "😊", color: "#facc15" },
-  focused:{ emoji: "🎯", color: "#2dd4bf" },
-  tired:  { emoji: "😴", color: "#a855f7" },
-  sad:    { emoji: "😔", color: "#64748b" },
-  angry:  { emoji: "😡", color: "#ef4444" }
-};
-
-/* =========================
-   MAP INIT
-========================= */
-const map = L.map('map').setView([0, 0], 2);
-
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '© OpenStreetMap contributors'
-}).addTo(map);
-
-/* =========================
-   LOAD MOODS (LAST 24H)
-========================= */
-function loadMoods() {
-  map.eachLayer(layer => {
-    if (layer instanceof L.CircleMarker) map.removeLayer(layer);
-  });
-
-  const moods = JSON.parse(localStorage.getItem('moodLog') || '[]');
-  const now = Date.now();
-  const last24h = moods.filter(m => now - new Date(m.timestamp) < 86400000);
-
-  const moodCounts = {};
-
-  last24h.forEach(entry => {
-    const mood = MOODS[entry.mood];
-    moodCounts[entry.mood] = (moodCounts[entry.mood] || 0) + 1;
-
-    L.circleMarker([entry.lat, entry.lng], {
-      radius: 10,
-      color: mood.color,
-      fillColor: mood.color,
-      fillOpacity: 0.6
-    })
-    .addTo(map)
-    .bindPopup(`
-      <div class="text-center">
-        <div style="font-size:24px">${mood.emoji}</div>
-        <small>${new Date(entry.timestamp).toLocaleString()}</small>
+      <!-- World Mood Summary -->
+      <div class="glass inline-block px-4 py-2 rounded-xl shadow text-lg font-semibold">
+        <span id="worldMood">Loading world mood…</span>
       </div>
-    `);
-  });
+    </header>
 
-  updateWorldMood(moodCounts);
-}
+    <!-- Mood Picker -->
+    <section class="bg-white rounded-xl shadow p-6 text-center">
+      <h2 class="text-xl font-semibold mb-4">
+        How are you feeling right now?
+      </h2>
 
-/* =========================
-   WORLD MOOD SUMMARY
-========================= */
-function updateWorldMood(counts) {
-  const entries = Object.entries(counts);
-  if (!entries.length) {
-    document.getElementById("worldMood").innerText = "No moods yet 🌱";
-    return;
-  }
-  entries.sort((a, b) => b[1] - a[1]);
-  const top = entries[0][0];
-  document.getElementById("worldMood").innerText =
-    `World Mood (24h): Mostly ${top} ${MOODS[top].emoji}`;
-}
+      <div id="moodButtons" class="flex flex-wrap justify-center gap-4"></div>
 
-/* =========================
-   LOG MOOD
-========================= */
-function logMood(moodKey) {
-  navigator.geolocation.getCurrentPosition(pos => {
-    const entry = {
-      mood: moodKey,
-      lat: pos.coords.latitude,
-      lng: pos.coords.longitude,
-      timestamp: new Date().toISOString()
+      <p class="text-xs text-slate-500 mt-4">
+        Anonymous by default • Only last 24h is shown
+      </p>
+    </section>
+
+    <!-- Map -->
+    <div id="map" class="rounded-xl shadow"></div>
+
+    <!-- Footer -->
+    <footer class="text-center text-xs text-slate-500">
+      Built for vibes ✨ • Data stored locally (for now)
+    </footer>
+
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    /* =========================
+       CONFIG
+    ========================== */
+
+    const TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+    const MOODS = {
+      calm:        { label: "Calm",        emoji: "😌", color: "#38bdf8" },
+      happy:       { label: "Happy",       emoji: "😊", color: "#facc15" },
+      energised:   { label: "Energised",   emoji: "⚡", color: "#fb923c" },
+      loved:       { label: "Loved",       emoji: "❤️", color: "#fb7185" },
+      focused:     { label: "Focused",     emoji: "🎯", color: "#2dd4bf" },
+      neutral:     { label: "Neutral",     emoji: "😐", color: "#94a3b8" },
+      tired:       { label: "Tired",       emoji: "😴", color: "#a855f7" },
+      sad:         { label: "Sad",         emoji: "😔", color: "#64748b" },
+      anxious:     { label: "Anxious",     emoji: "😟", color: "#f59e0b" },
+      angry:       { label: "Angry",       emoji: "😡", color: "#ef4444" },
+      lonely:      { label: "Lonely",      emoji: "🌑", color: "#6366f1" },
+      overwhelmed: { label: "Overwhelmed", emoji: "🌪️", color: "#7c3aed" }
     };
 
-    const moods = JSON.parse(localStorage.getItem('moodLog') || '[]');
-    moods.push(entry);
-    localStorage.setItem('moodLog', JSON.stringify(moods));
+    /* =========================
+       MAP INITIALIZATION
+    ========================== */
 
-    loadMoods();
-    map.setView([entry.lat, entry.lng], 6);
-  });
-}
+    const map = L.map('map', { worldCopyJump: true }).setView([0, 0], 2);
 
-/* =========================
-   INIT
-========================= */
-loadMoods();
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
 
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('service-worker.js');
-}
-</script>
+    // Layer group so we can clear markers easily
+    const moodLayer = L.layerGroup().addTo(map);
+
+    /* =========================
+       UI: MOOD BUTTONS
+    ========================== */
+
+    const moodButtonsEl = document.getElementById("moodButtons");
+
+    function renderMoodButtons() {
+      moodButtonsEl.innerHTML = "";
+
+      Object.entries(MOODS).forEach(([key, mood]) => {
+        const btn = document.createElement("button");
+        btn.className =
+          "group relative w-14 h-14 rounded-2xl shadow bg-white hover:scale-105 active:scale-95 transition " +
+          "flex items-center justify-center text-2xl";
+        btn.title = mood.label;
+        btn.setAttribute("aria-label", mood.label);
+        btn.onclick = () => logMood(key);
+
+        // tiny color dot
+        const dot = document.createElement("span");
+        dot.className = "absolute -top-1 -right-1 w-4 h-4 rounded-full ring-2 ring-white";
+        dot.style.background = mood.color;
+
+        // emoji
+        const emoji = document.createElement("span");
+        emoji.textContent = mood.emoji;
+
+        btn.appendChild(dot);
+        btn.appendChild(emoji);
+        moodButtonsEl.appendChild(btn);
+      });
+    }
+
+    renderMoodButtons();
+
+    /* =========================
+       STORAGE HELPERS
+    ========================== */
+
+    function getAllMoods() {
+      return JSON.parse(localStorage.getItem("moodLog") || "[]");
+    }
+
+    function setAllMoods(moods) {
+      localStorage.setItem("moodLog", JSON.stringify(moods));
+    }
+
+    function pruneOldMoods(moods) {
+      const now = Date.now();
+      return moods.filter(m => (now - new Date(m.timestamp).getTime()) < TTL_MS);
+    }
+
+    /* =========================
+       WORLD MOOD SUMMARY
+    ========================== */
+
+    function updateWorldMoodSummary(moods24h) {
+      const el = document.getElementById("worldMood");
+
+      if (!moods24h.length) {
+        el.textContent = "No moods yet 🌱 Be the first.";
+        return;
+      }
+
+      const counts = {};
+      moods24h.forEach(m => {
+        counts[m.mood] = (counts[m.mood] || 0) + 1;
+      });
+
+      const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+      const [topMoodKey, topCount] = sorted[0];
+      const total = moods24h.length;
+
+      const top = MOODS[topMoodKey];
+      const pct = Math.round((topCount / total) * 100);
+
+      el.textContent = `World Mood (24h): Mostly ${top.label} ${top.emoji} • ${pct}%`;
+    }
+
+    /* =========================
+       MARKER RENDERING
+    ========================== */
+
+    function moodOpacityFromAge(ageMs) {
+      // Newer = stronger. Old = faint.
+      // age 0ms -> 0.85, age TTL -> 0.15
+      const t = Math.min(ageMs / TTL_MS, 1);
+      return 0.85 - (0.70 * t);
+    }
+
+    function moodRadiusFromAge(ageMs) {
+      // Newer slightly larger
+      const t = Math.min(ageMs / TTL_MS, 1);
+      return 12 - (4 * t); // 12 -> 8
+    }
+
+    function renderMoodsOnMap(moods24h) {
+      moodLayer.clearLayers();
+
+      const now = Date.now();
+
+      moods24h.forEach(entry => {
+        const mood = MOODS[entry.mood];
+        const ageMs = now - new Date(entry.timestamp).getTime();
+
+        const opacity = moodOpacityFromAge(ageMs);
+        const radius = moodRadiusFromAge(ageMs);
+
+        const marker = L.circleMarker([entry.lat, entry.lng], {
+          radius,
+          color: mood.color,
+          weight: 2,
+          fillColor: mood.color,
+          fillOpacity: opacity
+        });
+
+        marker.bindPopup(`
+          <div style="text-align:center; min-width: 140px;">
+            <div style="font-size: 26px; line-height: 1;">${mood.emoji}</div>
+            <div style="font-weight: 700; margin-top: 4px;">${mood.label}</div>
+            <div style="font-size: 12px; opacity: 0.75; margin-top: 4px;">
+              ${new Date(entry.timestamp).toLocaleString()}
+            </div>
+          </div>
+        `);
+
+        marker.addTo(moodLayer);
+      });
+    }
+
+    /* =========================
+       LOAD + REFRESH
+    ========================== */
+
+    function refreshApp() {
+      let moods = getAllMoods();
+      moods = pruneOldMoods(moods);
+      setAllMoods(moods);
+
+      updateWorldMoodSummary(moods);
+      renderMoodsOnMap(moods);
+    }
+
+    refreshApp();
+
+    // refresh every 30 seconds (keeps decay + summary alive)
+    setInterval(refreshApp, 30000);
+
+    /* =========================
+       LOG MOOD + LOCATION
+    ========================== */
+
+    function logMood(moodKey) {
+      if (!navigator.geolocation) {
+        alert("Geolocation not supported ❌");
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        position => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+
+          const entry = {
+            mood: moodKey,
+            lat,
+            lng,
+            timestamp: new Date().toISOString()
+          };
+
+          const moods = pruneOldMoods(getAllMoods());
+          moods.push(entry);
+          setAllMoods(moods);
+
+          refreshApp();
+          map.setView([lat, lng], 6);
+        },
+        () => alert("Location permission denied ❌"),
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    }
+
+    /* =========================
+       USER LOCATION ON LOAD
+    ========================== */
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(pos => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+
+        map.setView([lat, lng], 5);
+
+        L.marker([lat, lng])
+          .addTo(map)
+          .bindPopup("You're here 📍")
+          .openPopup();
+      });
+    }
+
+    /* =========================
+       SERVICE WORKER
+    ========================== */
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js')
+        .then(() => console.log('Service Worker Registered ✔️'))
+        .catch(err => console.log("SW error:", err));
+    }
+  </script>
 
 </body>
 </html>
