@@ -2,241 +2,1117 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>MoodSpace 🌍</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  <!-- Theme -->
-  <meta name="theme-color" content="#020617"/>
+  <title>MoodSpace 🌍</title>
 
   <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <style>
-    #map {
-      height: 420px;
-      border-radius: 18px;
-      overflow: hidden;
-      box-shadow: 0 12px 30px rgba(0,0,0,0.45);
+    :root{
+      --bg0:#070a14;
+      --bg1:#0b1022;
+      --card:#0f1733;
+      --card2:#101a3a;
+      --line:rgba(255,255,255,.08);
+      --text:rgba(255,255,255,.92);
+      --muted:rgba(255,255,255,.64);
+      --muted2:rgba(255,255,255,.44);
+      --glow:rgba(99,102,241,.35);
+      --calm:#22c55e;
+      --heavy:#a855f7;
+      --energy:#f59e0b;
     }
+    html,body{ height:100%; background: radial-gradient(1200px 800px at 30% -10%, rgba(99,102,241,.28), transparent 60%),
+                               radial-gradient(1000px 700px at 90% 10%, rgba(56,189,248,.18), transparent 55%),
+                               linear-gradient(180deg, var(--bg0), var(--bg1)); color: var(--text); }
+    .glass{ background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03)); border:1px solid var(--line); backdrop-filter: blur(12px); }
+    .pill{ border:1px solid var(--line); background: rgba(255,255,255,.05); }
+    .pill:hover{ border-color: rgba(255,255,255,.18); }
+    .btnMood{ border:1px solid var(--line); background: rgba(255,255,255,.06); }
+    .btnMood:hover{ background: rgba(255,255,255,.10); }
+    .shadowGlow{ box-shadow: 0 0 0 1px rgba(255,255,255,.06), 0 12px 40px rgba(0,0,0,.45), 0 0 60px var(--glow); }
+    #map{ height: 360px; border-radius: 18px; overflow:hidden; }
+    .leaflet-control-attribution{ display:none; }
 
-    .map-overlay {
-      position:absolute;
-      inset:0;
-      background:rgba(2,6,23,0.35);
-      pointer-events:none;
-      z-index:400;
-    }
-
-    .pulse {
-      width:14px;
-      height:14px;
-      border-radius:50%;
-      background:#818cf8;
-      box-shadow:0 0 14px rgba(129,140,248,0.9);
-      position:relative;
-    }
-
-    .pulse::after {
-      content:'';
-      position:absolute;
-      inset:0;
-      border-radius:50%;
-      animation:pulse 2.5s infinite;
-      background:rgba(129,140,248,0.6);
-    }
-
-    @keyframes pulse {
-      from { transform:scale(1); opacity:1 }
-      to   { transform:scale(3); opacity:0 }
-    }
+    /* Vibe overlay */
+    #vibeCanvas{ position:absolute; inset:0; pointer-events:none; }
+    .mapWrap{ position:relative; }
+    .tiny{ font-size: 12px; color: var(--muted2); }
+    .kpi{ border:1px solid var(--line); background: rgba(255,255,255,.04); }
+    .bar{ height:10px; border-radius: 999px; background: rgba(255,255,255,.08); overflow:hidden; border:1px solid rgba(255,255,255,.10); }
+    .bar > div{ height:100%; border-radius: 999px; }
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace; }
+    .chipOn{ border-color: rgba(99,102,241,.7) !important; background: rgba(99,102,241,.16) !important; }
   </style>
 </head>
 
-<body class="bg-slate-900 text-slate-100 transition">
+<body class="min-h-screen">
+  <div class="max-w-5xl mx-auto px-4 py-5 space-y-5">
 
-<div class="max-w-5xl mx-auto p-4 space-y-6">
+    <!-- Header -->
+    <header class="text-center space-y-1">
+      <div class="text-4xl font-semibold tracking-tight">MoodSpace 🌍</div>
+      <div class="text-sm" style="color:var(--muted)">Arrive. Reflect. Record.</div>
 
-  <!-- Header -->
-  <header class="text-center space-y-1">
-    <h1 class="text-3xl font-semibold tracking-tight">MoodSpace 🌍</h1>
-    <p class="text-slate-400 text-sm">Arrive. Reflect. Record.</p>
-  </header>
+      <div class="flex items-center justify-center gap-3 mt-3">
+        <div class="pill rounded-full px-4 py-2 text-sm flex items-center gap-2">
+          <span>🔥</span>
+          <span><span id="streakCount" class="font-semibold">0</span> day check-in streak</span>
+        </div>
 
-  <!-- Streak -->
-  <div class="text-center text-sm text-indigo-400">
-    🔥 <span id="streak">0</span> day check-in streak
+        <button id="toggleVibeLayer" class="pill rounded-full px-4 py-2 text-sm flex items-center gap-2">
+          <span>🗺️</span><span>Live Vibe</span>
+          <span id="vibeOnBadge" class="tiny">(off)</span>
+        </button>
+
+        <button id="toggleFriends" class="pill rounded-full px-4 py-2 text-sm flex items-center gap-2">
+          <span>🤝</span><span>Friends</span>
+          <span id="friendsBadge" class="tiny">(close)</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Map -->
+    <section class="glass shadowGlow rounded-2xl p-3">
+      <div class="mapWrap">
+        <div id="map"></div>
+        <canvas id="vibeCanvas"></canvas>
+      </div>
+      <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
+        <div class="tiny">
+          Tip: tap a marker to open a Venue Vibe card. Your check-ins are stored locally on this device.
+        </div>
+        <div class="flex gap-2">
+          <button id="centerMe" class="pill rounded-full px-3 py-2 text-sm">📍 Center</button>
+          <button id="addVenueMode" class="pill rounded-full px-3 py-2 text-sm">➕ Add venue</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main grid -->
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+      <!-- Check-in + venue -->
+      <div class="lg:col-span-2 space-y-4">
+
+        <!-- Venue Card -->
+        <div class="glass rounded-2xl p-4 space-y-3">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <div class="text-xs tracking-widest uppercase" style="color:var(--muted2)">Selected venue</div>
+              <div id="venueName" class="text-xl font-semibold">Tap a marker</div>
+              <div id="venueMeta" class="tiny">Choose a place to see its vibe intelligence.</div>
+            </div>
+            <div class="text-right">
+              <div class="text-xs tracking-widest uppercase" style="color:var(--muted2)">Overall vibe</div>
+              <div id="venueOverall" class="text-sm" style="color:var(--muted)">—</div>
+            </div>
+          </div>
+
+          <!-- Vibe bars -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="kpi rounded-xl p-3">
+              <div class="flex items-center justify-between">
+                <div class="text-sm">😊 Calm</div>
+                <div class="mono text-sm" id="vCalm">—</div>
+              </div>
+              <div class="bar mt-2"><div id="barCalm" style="width:0%; background: var(--calm)"></div></div>
+              <div class="tiny mt-2" id="vCalmHint">—</div>
+            </div>
+            <div class="kpi rounded-xl p-3">
+              <div class="flex items-center justify-between">
+                <div class="text-sm">😮‍💨 Heavy</div>
+                <div class="mono text-sm" id="vHeavy">—</div>
+              </div>
+              <div class="bar mt-2"><div id="barHeavy" style="width:0%; background: var(--heavy)"></div></div>
+              <div class="tiny mt-2" id="vHeavyHint">—</div>
+            </div>
+            <div class="kpi rounded-xl p-3">
+              <div class="flex items-center justify-between">
+                <div class="text-sm">⚡ Energised</div>
+                <div class="mono text-sm" id="vEnergy">—</div>
+              </div>
+              <div class="bar mt-2"><div id="barEnergy" style="width:0%; background: var(--energy)"></div></div>
+              <div class="tiny mt-2" id="vEnergyHint">—</div>
+            </div>
+          </div>
+
+          <!-- Patterns + insight -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="kpi rounded-xl p-3">
+              <div class="text-sm font-medium">Time patterns</div>
+              <div class="tiny mt-1" id="vTimePatterns">—</div>
+            </div>
+            <div class="kpi rounded-xl p-3">
+              <div class="text-sm font-medium">Micro insight</div>
+              <div class="tiny mt-1" id="vInsight">—</div>
+            </div>
+          </div>
+
+          <!-- Your history -->
+          <div class="kpi rounded-xl p-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="text-sm font-medium">Your history here</div>
+              <div class="tiny" id="vLastVisit">—</div>
+            </div>
+            <div class="tiny mt-1" id="vHistory">—</div>
+          </div>
+        </div>
+
+        <!-- Check-in -->
+        <div class="glass rounded-2xl p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="text-lg font-semibold">How do you feel here?</div>
+            <div class="tiny" id="checkinStatus">Select a venue to check in.</div>
+          </div>
+
+          <div class="flex flex-wrap gap-2">
+            <button class="btnMood rounded-xl px-4 py-3 text-sm flex items-center gap-2" data-mood="calm">
+              <span>😊</span><span>Calm</span>
+            </button>
+            <button class="btnMood rounded-xl px-4 py-3 text-sm flex items-center gap-2" data-mood="heavy">
+              <span>😮‍💨</span><span>Heavy</span>
+            </button>
+            <button class="btnMood rounded-xl px-4 py-3 text-sm flex items-center gap-2" data-mood="energised">
+              <span>⚡</span><span>Energised</span>
+            </button>
+          </div>
+
+          <textarea id="reflection" class="w-full rounded-xl p-3 bg-black/30 border border-white/10 outline-none focus:border-white/20"
+                    rows="3" placeholder="Optional reflection… (saved privately on this device)"></textarea>
+
+          <div class="flex items-center justify-between gap-2">
+            <div class="tiny">No feed. No likes. No comments. Just your emotional map.</div>
+            <button id="saveCheckin" class="rounded-xl px-4 py-2 text-sm font-medium bg-indigo-500/20 border border-indigo-300/30 hover:bg-indigo-500/30">
+              Save check-in
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Personal stats -->
+      <div class="space-y-4">
+
+        <div class="glass rounded-2xl p-4">
+          <div class="flex items-center justify-between">
+            <div class="text-lg font-semibold">Your Stats</div>
+            <div class="tiny" id="statsUpdated">—</div>
+          </div>
+
+          <div class="mt-3 space-y-3">
+            <div class="kpi rounded-xl p-3">
+              <div class="text-sm font-medium">Today</div>
+              <div class="tiny mt-1" id="statToday">—</div>
+            </div>
+
+            <div class="kpi rounded-xl p-3">
+              <div class="text-sm font-medium">This week</div>
+              <div class="tiny mt-1" id="statWeek">—</div>
+            </div>
+
+            <div class="kpi rounded-xl p-3">
+              <div class="text-sm font-medium">This year</div>
+              <div class="tiny mt-1" id="statYear">—</div>
+            </div>
+
+            <div class="kpi rounded-xl p-3">
+              <div class="text-sm font-medium">Trends</div>
+              <canvas id="trendChart" height="110" class="mt-2 w-full"></canvas>
+              <div class="tiny mt-2" id="trendHint">—</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Friends (ambient) -->
+        <div class="glass rounded-2xl p-4">
+          <div class="flex items-center justify-between">
+            <div class="text-lg font-semibold">Friends (Ambient)</div>
+            <div class="tiny" id="friendsModeLabel">Close Friends</div>
+          </div>
+          <div class="tiny mt-2">
+            You’ll never see posts, likes, or comments. Only “presence” and optional anonymous vibe signals.
+          </div>
+
+          <div class="mt-3 grid grid-cols-3 gap-2">
+            <button class="pill rounded-xl px-2 py-2 text-xs" data-fmode="private">🔒 Private</button>
+            <button class="pill rounded-xl px-2 py-2 text-xs" data-fmode="anonymous">👀 Anonymous</button>
+            <button class="pill rounded-xl px-2 py-2 text-xs chipOn" data-fmode="close">🤝 Close</button>
+          </div>
+
+          <div class="mt-3 kpi rounded-xl p-3">
+            <div class="text-sm font-medium">Nearby pulse</div>
+            <div class="tiny mt-1" id="friendsPulse">—</div>
+          </div>
+
+          <div class="mt-3 kpi rounded-xl p-3">
+            <div class="text-sm font-medium">What friends can see</div>
+            <div class="tiny mt-1" id="friendsVisibility">—</div>
+          </div>
+        </div>
+
+        <!-- Utilities -->
+        <div class="glass rounded-2xl p-4">
+          <div class="text-lg font-semibold">Utilities</div>
+          <div class="tiny mt-1">Export and reset are local-only (no server).</div>
+
+          <div class="mt-3 flex flex-wrap gap-2">
+            <button id="exportData" class="pill rounded-xl px-3 py-2 text-sm">⬇️ Export JSON</button>
+            <button id="resetData" class="pill rounded-xl px-3 py-2 text-sm">🧹 Reset</button>
+          </div>
+
+          <div class="tiny mt-3" id="deviceNote">—</div>
+        </div>
+
+      </div>
+    </section>
+
+    <footer class="text-center tiny py-4" style="color:var(--muted2)">
+      MoodSpace prototype • GitHub Pages ready • LocalStorage only
+    </footer>
   </div>
 
-  <!-- Map -->
-  <div class="relative">
-    <div id="map"></div>
-    <div class="map-overlay"></div>
-  </div>
+  <!-- Leaflet -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Mood Panel -->
-  <div id="panel" class="hidden bg-slate-800 rounded-2xl p-5 space-y-4 shadow-xl">
+  <script>
+    /***********************
+     * MoodSpace Prototype
+     * - Single file
+     * - LocalStorage persistence
+     * - Venue intelligence
+     * - Personal stats
+     * - Ambient friends
+     * - Live vibe layer (anonymous)
+     ************************/
 
-    <h2 class="text-lg font-medium">How do you feel here?</h2>
+    const LS_KEY = "moodspace_v1_data";
+    const now = () => new Date();
+    const pad2 = n => String(n).padStart(2, "0");
+    const ymd = (d) => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+    const hour = (d) => d.getHours();
 
-    <div class="flex gap-2 flex-wrap">
-      <button onclick="selectMood('Calm')" class="px-4 py-2 rounded-xl bg-indigo-500/20">😊 Calm</button>
-      <button onclick="selectMood('Heavy')" class="px-4 py-2 rounded-xl bg-purple-500/20">😔 Heavy</button>
-      <button onclick="selectMood('Energised')" class="px-4 py-2 rounded-xl bg-yellow-400/20">⚡ Energised</button>
-    </div>
+    const MOODS = {
+      calm: { label:"Calm", emoji:"😊", colorVar:"--calm" },
+      heavy: { label:"Heavy", emoji:"😮‍💨", colorVar:"--heavy" },
+      energised: { label:"Energised", emoji:"⚡", colorVar:"--energy" }
+    };
 
-    <p id="prompt" class="text-sm text-slate-300 italic"></p>
+    const DEFAULT_VENUES = [
+      { id:"v1", name:"Surfers Paradise", lat:-28.0029, lng:153.4317, type:"Beach / City" },
+      { id:"v2", name:"Burleigh Heads", lat:-28.1026, lng:153.4512, type:"Beach / Walk" },
+      { id:"v3", name:"Miami Marketta", lat:-28.0719, lng:153.4420, type:"Food / Night" },
+      { id:"v4", name:"Little Caesars Arena (demo)", lat:42.3410, lng:-83.0550, type:"Arena" },
+    ];
 
-    <textarea
-      id="note"
-      placeholder="Optional reflection…"
-      class="w-full p-3 rounded-xl bg-slate-900 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-      rows="3"
-    ></textarea>
+    function loadData(){
+      const raw = localStorage.getItem(LS_KEY);
+      if(raw){
+        try { return JSON.parse(raw); } catch(e){}
+      }
+      // Seed a tiny bit of demo data to make it feel alive
+      const seed = {
+        venues: DEFAULT_VENUES,
+        checkins: [],
+        friendsMode: "close",
+        vibeLayerOn: false,
+        // anonymous pulses (fake) refreshed occasionally
+        pulses: []
+      };
+      // Seed a couple of historical check-ins
+      const d0 = new Date(); d0.setDate(d0.getDate()-3); d0.setHours(7);
+      const d1 = new Date(); d1.setDate(d1.getDate()-2); d1.setHours(18);
+      const d2 = new Date(); d2.setDate(d2.getDate()-1); d2.setHours(9);
+      seed.checkins.push(
+        { id: crypto.randomUUID(), venueId:"v2", ts: d0.toISOString(), mood:"calm", reflection:"Morning walk. Ocean reset." },
+        { id: crypto.randomUUID(), venueId:"v1", ts: d1.toISOString(), mood:"energised", reflection:"Big night lights." },
+        { id: crypto.randomUUID(), venueId:"v2", ts: d2.toISOString(), mood:"calm", reflection:"Coffee + coastline." }
+      );
+      saveData(seed);
+      return seed;
+    }
 
-    <div class="flex gap-2">
-      <button onclick="saveMood()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 transition py-3 rounded-xl font-medium">
-        Save Mood
-      </button>
-      <button onclick="returnToLast()" class="px-4 py-3 bg-slate-700 rounded-xl">
-        ⏪
-      </button>
-    </div>
+    function saveData(data){
+      localStorage.setItem(LS_KEY, JSON.stringify(data));
+    }
 
-  </div>
+    let data = loadData();
 
-</div>
+    /***************
+     * Map
+     ***************/
+    const map = L.map('map', { zoomControl: false, preferCanvas:true }).setView([-28.0029, 153.4317], 14);
 
-<script>
-/* 🌍 MAP INIT */
-const map = L.map('map', {
-  zoomControl:false,
-  attributionControl:false
-}).setView([20, 0], 2);
+    // Satellite-ish tiles (Esri)
+    L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      { maxZoom: 19 }
+    ).addTo(map);
 
-/* 🛰️ SATELLITE TILES */
-L.tileLayer(
-  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-  { maxZoom:18 }
-).addTo(map);
+    L.control.zoom({ position:"bottomright" }).addTo(map);
 
-const pulseIcon = L.divIcon({
-  className:'',
-  html:'<div class="pulse"></div>',
-  iconSize:[14,14]
-});
+    const markersLayer = L.layerGroup().addTo(map);
+    const friendsLayer = L.layerGroup().addTo(map);
 
-/* 📍 STATE */
-let current = {};
-let moods = JSON.parse(localStorage.getItem('moods') || '[]');
+    let selectedVenueId = null;
+    let pendingMood = null;
+    let addVenueActive = false;
 
-/* 🎥 CINEMATIC ARRIVAL */
-function arrive(lat, lng) {
-  current.lat = lat;
-  current.lng = lng;
+    function addMarker(venue){
+      const m = L.circleMarker([venue.lat, venue.lng], {
+        radius: 8,
+        weight: 2,
+        color: "rgba(255,255,255,.75)",
+        fillColor: "rgba(99,102,241,.55)",
+        fillOpacity: 0.85
+      });
+      m.on("click", () => selectVenue(venue.id));
+      m.addTo(markersLayer);
+      venue._marker = m;
+    }
 
-  // Long descent
-  map.flyTo([lat, lng], 15, {
-    animate: true,
-    duration: 2.8,
-    easeLinearity: 0.18
-  });
+    function renderVenues(){
+      markersLayer.clearLayers();
+      data.venues.forEach(addMarker);
+    }
 
-  // Gentle settle
-  setTimeout(() => {
-    map.flyTo([lat, lng], 14, {
-      animate: true,
-      duration: 0.6,
-      easeLinearity: 0.3
+    renderVenues();
+
+    // Vibe canvas overlay
+    const vibeCanvas = document.getElementById("vibeCanvas");
+    const vibeCtx = vibeCanvas.getContext("2d");
+
+    function resizeVibeCanvas(){
+      const mapEl = document.getElementById("map");
+      const rect = mapEl.getBoundingClientRect();
+      vibeCanvas.width = Math.floor(rect.width);
+      vibeCanvas.height = Math.floor(rect.height);
+      drawVibeLayer();
+    }
+
+    window.addEventListener("resize", resizeVibeCanvas);
+    map.on("move zoom", () => drawVibeLayer());
+    setTimeout(resizeVibeCanvas, 50);
+
+    function moodToRGBA(mood, alpha=0.28){
+      if(mood==="calm") return `rgba(34,197,94,${alpha})`;
+      if(mood==="heavy") return `rgba(168,85,247,${alpha})`;
+      return `rgba(245,158,11,${alpha})`;
+    }
+
+    function drawVibeLayer(){
+      vibeCtx.clearRect(0,0,vibeCanvas.width,vibeCanvas.height);
+      if(!data.vibeLayerOn) return;
+
+      // Use last ~80 checkins across all venues (anonymous “weather”)
+      const recent = data.checkins.slice().sort((a,b)=> new Date(b.ts)-new Date(a.ts)).slice(0,80);
+      // Also add some fake ambient pulses for “live” feel
+      const pulses = generateAnonymousPulses();
+
+      const points = recent.map(c => {
+        const v = data.venues.find(x=>x.id===c.venueId);
+        if(!v) return null;
+        const p = map.latLngToContainerPoint([v.lat, v.lng]);
+        return { x:p.x, y:p.y, mood:c.mood, strength: 1.0 };
+      }).filter(Boolean).concat(pulses);
+
+      // Draw soft blobs
+      points.forEach(pt=>{
+        const r = 60 + Math.random()*30;
+        const grad = vibeCtx.createRadialGradient(pt.x, pt.y, 8, pt.x, pt.y, r);
+        grad.addColorStop(0, moodToRGBA(pt.mood, 0.30));
+        grad.addColorStop(1, "rgba(0,0,0,0)");
+        vibeCtx.fillStyle = grad;
+        vibeCtx.beginPath();
+        vibeCtx.arc(pt.x, pt.y, r, 0, Math.PI*2);
+        vibeCtx.fill();
+      });
+
+      // Add subtle vignette
+      const w=vibeCanvas.width,h=vibeCanvas.height;
+      const vg = vibeCtx.createRadialGradient(w/2,h/2, Math.min(w,h)/6, w/2,h/2, Math.max(w,h)/1.2);
+      vg.addColorStop(0, "rgba(0,0,0,0)");
+      vg.addColorStop(1, "rgba(0,0,0,.35)");
+      vibeCtx.fillStyle = vg;
+      vibeCtx.fillRect(0,0,w,h);
+    }
+
+    function generateAnonymousPulses(){
+      // Small number of "live" anonymous pulses around selected area
+      const center = map.getCenter();
+      const out = [];
+      const n = 10;
+      for(let i=0;i<n;i++){
+        const jitterLat = (Math.random()-0.5)*0.02;
+        const jitterLng = (Math.random()-0.5)*0.02;
+        const lat = center.lat + jitterLat;
+        const lng = center.lng + jitterLng;
+        const p = map.latLngToContainerPoint([lat,lng]);
+        const mood = ["calm","heavy","energised"][Math.floor(Math.random()*3)];
+        out.push({ x:p.x, y:p.y, mood, strength: 0.6 });
+      }
+      return out;
+    }
+
+    /***************
+     * Venue selection + intelligence
+     ***************/
+    const elVenueName = document.getElementById("venueName");
+    const elVenueMeta = document.getElementById("venueMeta");
+    const elVenueOverall = document.getElementById("venueOverall");
+    const elCheckinStatus = document.getElementById("checkinStatus");
+
+    const elVCalm = document.getElementById("vCalm");
+    const elVHeavy = document.getElementById("vHeavy");
+    const elVEnergy = document.getElementById("vEnergy");
+    const barCalm = document.getElementById("barCalm");
+    const barHeavy = document.getElementById("barHeavy");
+    const barEnergy = document.getElementById("barEnergy");
+    const vCalmHint = document.getElementById("vCalmHint");
+    const vHeavyHint = document.getElementById("vHeavyHint");
+    const vEnergyHint = document.getElementById("vEnergyHint");
+
+    const vTimePatterns = document.getElementById("vTimePatterns");
+    const vInsight = document.getElementById("vInsight");
+    const vHistory = document.getElementById("vHistory");
+    const vLastVisit = document.getElementById("vLastVisit");
+
+    function selectVenue(id){
+      selectedVenueId = id;
+      pendingMood = null;
+
+      // highlight marker
+      data.venues.forEach(v=>{
+        if(v._marker){
+          const isSel = (v.id===id);
+          v._marker.setStyle({
+            fillColor: isSel ? "rgba(245,158,11,.65)" : "rgba(99,102,241,.55)",
+            color: isSel ? "rgba(255,255,255,.95)" : "rgba(255,255,255,.75)"
+          });
+        }
+      });
+
+      updateVenueCard();
+      updateCheckinStatus();
+    }
+
+    function getVenueCheckins(venueId){
+      return data.checkins.filter(c => c.venueId===venueId).sort((a,b)=> new Date(b.ts)-new Date(a.ts));
+    }
+
+    function pct(n, total){
+      if(total<=0) return 0;
+      return Math.round((n/total)*100);
+    }
+
+    function summarizeVenue(venueId){
+      const list = getVenueCheckins(venueId);
+      const total = list.length;
+      const counts = { calm:0, heavy:0, energised:0 };
+      list.forEach(c=> counts[c.mood]++);
+
+      const calmP = pct(counts.calm, total);
+      const heavyP = pct(counts.heavy, total);
+      const energyP = pct(counts.energised, total);
+
+      // time patterns (simple bins)
+      const bins = {
+        morning: { calm:0, heavy:0, energised:0, total:0 },
+        afternoon:{ calm:0, heavy:0, energised:0, total:0 },
+        evening:{ calm:0, heavy:0, energised:0, total:0 }
+      };
+      list.forEach(c=>{
+        const d = new Date(c.ts);
+        const h = d.getHours();
+        const key = (h<12) ? "morning" : (h<17) ? "afternoon" : "evening";
+        bins[key][c.mood]++; bins[key].total++;
+      });
+
+      const binBest = (key) => {
+        const b = bins[key];
+        if(!b.total) return "—";
+        const mood = Object.keys(MOODS).sort((a,bm)=> b[bm]-b[a])[0];
+        return `${key}: ${MOODS[mood].emoji} ${MOODS[mood].label}`;
+      };
+
+      // micro insight: compare mornings etc
+      let insight = "Add a few check-ins to unlock stronger insights.";
+      if(total >= 5){
+        // pick the bin with highest calm share
+        const keys = ["morning","afternoon","evening"];
+        let bestKey = null, bestScore=-1;
+        keys.forEach(k=>{
+          const b=bins[k];
+          if(!b.total) return;
+          const score = (b.calm/b.total) - (b.heavy/b.total);
+          if(score>bestScore){ bestScore=score; bestKey=k; }
+        });
+        if(bestKey){
+          insight = `You tend to feel most ${MOODS.calm.label.toLowerCase()} here in the ${bestKey}.`;
+          // if energised dominates overall
+          const topMood = Object.keys(counts).sort((a,b)=> counts[b]-counts[a])[0];
+          if(topMood==="energised") insight = `This place reliably boosts your energy — especially after midday.`;
+          if(topMood==="heavy") insight = `This place can feel heavy — consider a quick “reset ritual” after you leave.`;
+        }
+      }
+
+      return { total, counts, calmP, heavyP, energyP, bins, binBest, insight, list };
+    }
+
+    function updateVenueCard(){
+      const venue = data.venues.find(v=>v.id===selectedVenueId);
+      if(!venue){
+        elVenueName.textContent = "Tap a marker";
+        elVenueMeta.textContent = "Choose a place to see its vibe intelligence.";
+        elVenueOverall.textContent = "—";
+
+        [elVCalm,elVHeavy,elVEnergy].forEach(el=> el.textContent="—");
+        [barCalm,barHeavy,barEnergy].forEach(b=> b.style.width="0%");
+        vCalmHint.textContent = vHeavyHint.textContent = vEnergyHint.textContent = "—";
+        vTimePatterns.textContent = "—";
+        vInsight.textContent = "—";
+        vHistory.textContent = "—";
+        vLastVisit.textContent = "—";
+        return;
+      }
+
+      const s = summarizeVenue(venue.id);
+
+      elVenueName.textContent = venue.name;
+      elVenueMeta.textContent = venue.type;
+
+      const topMood = s.total ? Object.keys(s.counts).sort((a,b)=> s.counts[b]-s.counts[a])[0] : null;
+      elVenueOverall.textContent = s.total ? `${MOODS[topMood].emoji} ${MOODS[topMood].label} • ${s.total} check-ins` : "No data yet — be the first.";
+
+      elVCalm.textContent = s.total ? `${s.calmP}%` : "—";
+      elVHeavy.textContent = s.total ? `${s.heavyP}%` : "—";
+      elVEnergy.textContent = s.total ? `${s.energyP}%` : "—";
+
+      barCalm.style.width = `${s.calmP}%`;
+      barHeavy.style.width = `${s.heavyP}%`;
+      barEnergy.style.width = `${s.energyP}%`;
+
+      vCalmHint.textContent = s.total ? `Most common when you visit before 10am.` : "—";
+      vHeavyHint.textContent = s.total ? `Often shows up after long days.` : "—";
+      vEnergyHint.textContent = s.total ? `Peaks around afternoons.` : "—";
+
+      vTimePatterns.textContent = s.total
+        ? `${s.binBest("morning")} • ${s.binBest("afternoon")} • ${s.binBest("evening")}`
+        : "—";
+
+      vInsight.textContent = s.insight;
+
+      const last = s.list[0];
+      if(last){
+        const d = new Date(last.ts);
+        vLastVisit.textContent = `Last visit: ${d.toLocaleString([], { weekday:"short", day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit" })} • ${MOODS[last.mood].emoji} ${MOODS[last.mood].label}`;
+      } else {
+        vLastVisit.textContent = "—";
+      }
+
+      if(s.total){
+        const most = topMood;
+        vHistory.textContent = `You’ve checked in here ${s.total} time${s.total===1?"":"s"}. Most common mood: ${MOODS[most].emoji} ${MOODS[most].label}.`;
+      } else {
+        vHistory.textContent = "No check-ins yet. Add one to start building your emotional map.";
+      }
+
+      drawVibeLayer();
+    }
+
+    function updateCheckinStatus(){
+      const venue = data.venues.find(v=>v.id===selectedVenueId);
+      if(!venue){
+        elCheckinStatus.textContent = "Select a venue to check in.";
+        return;
+      }
+      elCheckinStatus.textContent = pendingMood
+        ? `Ready to save: ${MOODS[pendingMood].emoji} ${MOODS[pendingMood].label}`
+        : `Check in at ${venue.name}`;
+    }
+
+    /***************
+     * Mood selection + saving
+     ***************/
+    document.querySelectorAll(".btnMood").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        if(!selectedVenueId){
+          elCheckinStatus.textContent = "Tap a venue marker first.";
+          return;
+        }
+        pendingMood = btn.dataset.mood;
+        document.querySelectorAll(".btnMood").forEach(b=> b.classList.remove("chipOn"));
+        btn.classList.add("chipOn");
+        updateCheckinStatus();
+      });
     });
-  }, 2800);
 
-  // Pin drop
-  setTimeout(() => {
-    L.marker([lat, lng], { icon: pulseIcon }).addTo(map);
+    document.getElementById("saveCheckin").addEventListener("click", ()=>{
+      const venue = data.venues.find(v=>v.id===selectedVenueId);
+      if(!venue){
+        elCheckinStatus.textContent = "Select a venue first.";
+        return;
+      }
+      if(!pendingMood){
+        elCheckinStatus.textContent = "Pick a mood first.";
+        return;
+      }
+      const reflection = (document.getElementById("reflection").value || "").trim();
+      data.checkins.push({
+        id: crypto.randomUUID(),
+        venueId: venue.id,
+        ts: now().toISOString(),
+        mood: pendingMood,
+        reflection
+      });
+      saveData(data);
 
-    // UI reveal after a beat
-    setTimeout(() => {
-      document.getElementById('panel').classList.remove('hidden');
-      renderHeatmap();
-    }, 300);
+      document.getElementById("reflection").value = "";
+      document.querySelectorAll(".btnMood").forEach(b=> b.classList.remove("chipOn"));
+      pendingMood = null;
 
-  }, 3400);
-}
+      updateVenueCard();
+      updateAllStats();
+      updateStreak();
 
-/* 📡 GEOLOCATION */
-navigator.geolocation?.getCurrentPosition(
-  p => arrive(p.coords.latitude, p.coords.longitude),
-  () => arrive(-28.0167, 153.4000) // Gold Coast fallback
-);
+      elCheckinStatus.textContent = `Saved ✅ (${venue.name})`;
+      setTimeout(updateCheckinStatus, 1200);
+    });
 
-/* 😊 MOOD */
-function selectMood(mood) {
-  current.mood = mood;
-  const prompts = {
-    Calm: "What’s creating calm for you in this moment?",
-    Heavy: "What feels heavy — and what might help lighten it?",
-    Energised: "Where is this energy coming from?"
-  };
-  document.getElementById('prompt').innerText = prompts[mood];
-}
+    /***************
+     * Personal stats
+     ***************/
+    const elToday = document.getElementById("statToday");
+    const elWeek = document.getElementById("statWeek");
+    const elYear = document.getElementById("statYear");
+    const elStatsUpdated = document.getElementById("statsUpdated");
 
-/* 💾 SAVE */
-function saveMood() {
-  if (!current.mood) return alert("Please select a mood");
+    function startOfWeek(d){
+      const x = new Date(d);
+      const day = x.getDay(); // 0 Sun
+      const diff = (day===0 ? -6 : 1-day); // Monday
+      x.setDate(x.getDate()+diff);
+      x.setHours(0,0,0,0);
+      return x;
+    }
 
-  const entry = {
-    ...current,
-    note: note.value,
-    date: new Date().toDateString()
-  };
+    function startOfYear(d){
+      const x = new Date(d.getFullYear(),0,1);
+      x.setHours(0,0,0,0);
+      return x;
+    }
 
-  moods.push(entry);
-  localStorage.setItem('moods', JSON.stringify(moods));
-  updateStreak();
-  alert("Mood saved 🌱");
-}
+    function countByMood(checkins){
+      const c = { calm:0, heavy:0, energised:0 };
+      checkins.forEach(x => c[x.mood]++);
+      const total = checkins.length;
+      const top = total ? Object.keys(c).sort((a,b)=> c[b]-c[a])[0] : null;
+      return { c, total, top };
+    }
 
-/* 🔥 STREAK */
-function updateStreak() {
-  const uniqueDates = [...new Set(moods.map(m => m.date))];
-  let streak = 0;
+    function dominantEnvironmentToday(todayList){
+      // lightweight heuristic: pick the venue type that appears most
+      if(!todayList.length) return "—";
+      const byType = {};
+      todayList.forEach(ci=>{
+        const v = data.venues.find(x=>x.id===ci.venueId);
+        const t = v?.type || "Other";
+        byType[t] = (byType[t]||0)+1;
+      });
+      const topType = Object.entries(byType).sort((a,b)=> b[1]-a[1])[0][0];
+      return topType;
+    }
 
-  for (let i = uniqueDates.length - 1; i >= 0; i--) {
-    const diff = (Date.now() - new Date(uniqueDates[i])) / 86400000;
-    if (diff <= streak + 1) streak++;
-    else break;
-  }
-  document.getElementById('streak').innerText = streak;
-}
-updateStreak();
+    function updateAllStats(){
+      const n = now();
+      const todayKey = ymd(n);
 
-/* 🔥 HEATMAP */
-function renderHeatmap() {
-  moods.forEach(m => {
-    const color =
-      m.mood === 'Calm' ? '#60a5fa' :
-      m.mood === 'Energised' ? '#fde047' :
-      '#c084fc';
+      const all = data.checkins.slice().sort((a,b)=> new Date(a.ts)-new Date(b.ts));
 
-    L.circle([m.lat, m.lng], {
-      radius: 40,
-      color,
-      fillOpacity: 0.6
-    }).addTo(map);
-  });
-}
+      const today = all.filter(c => ymd(new Date(c.ts)) === todayKey);
+      const wkStart = startOfWeek(n);
+      const week = all.filter(c => new Date(c.ts) >= wkStart);
+      const yrStart = startOfYear(n);
+      const year = all.filter(c => new Date(c.ts) >= yrStart);
 
-/* ⏪ RETURN */
-function returnToLast() {
-  if (!moods.length) return;
-  const last = moods[moods.length - 1];
-  map.flyTo([last.lat, last.lng], 14, { duration: 1 });
-}
-</script>
+      const t = countByMood(today);
+      const w = countByMood(week);
+      const y = countByMood(year);
 
+      elStatsUpdated.textContent = `Updated: ${new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}`;
+
+      // Today summary
+      if(t.total){
+        const env = dominantEnvironmentToday(today);
+        elToday.textContent = `${t.total} check-in${t.total===1?"":"s"} • Dominant: ${MOODS[t.top].emoji} ${MOODS[t.top].label} • Environment: ${env}`;
+      } else {
+        elToday.textContent = "No check-ins today yet. One tap = one data point.";
+      }
+
+      // Week summary
+      if(w.total){
+        elWeek.textContent = `${w.total} check-ins • Calm ${pct(w.c.calm,w.total)}% • Heavy ${pct(w.c.heavy,w.total)}% • Energised ${pct(w.c.energised,w.total)}%`;
+      } else {
+        elWeek.textContent = "No check-ins this week yet.";
+      }
+
+      // Year summary + “most calming place”
+      if(y.total){
+        // find most calming venue by calm share (min 2 visits)
+        let best = null;
+        data.venues.forEach(v=>{
+          const list = data.checkins.filter(c=>c.venueId===v.id);
+          if(list.length < 2) return;
+          const calmCount = list.filter(c=>c.mood==="calm").length;
+          const share = calmCount / list.length;
+          if(!best || share > best.share){
+            best = { v, share, n: list.length };
+          }
+        });
+
+        const bestStr = best ? ` • Most calming: ${best.v.name} (${Math.round(best.share*100)}%)` : "";
+        elYear.textContent = `${y.total} check-ins • Dominant: ${MOODS[y.top].emoji} ${MOODS[y.top].label}${bestStr}`;
+      } else {
+        elYear.textContent = "No check-ins this year yet.";
+      }
+
+      drawTrendChart(all);
+      updateFriendsPulse();
+    }
+
+    // Trend chart (last 14 days mood mix)
+    const trendCanvas = document.getElementById("trendChart");
+    const trendCtx = trendCanvas.getContext("2d");
+    const trendHint = document.getElementById("trendHint");
+
+    function drawTrendChart(all){
+      const days = 14;
+      const end = new Date(); end.setHours(23,59,59,999);
+      const start = new Date(end); start.setDate(start.getDate()-(days-1)); start.setHours(0,0,0,0);
+
+      const buckets = [];
+      for(let i=0;i<days;i++){
+        const d = new Date(start); d.setDate(start.getDate()+i);
+        buckets.push({ key: ymd(d), calm:0, heavy:0, energised:0, total:0 });
+      }
+      const idx = Object.fromEntries(buckets.map((b,i)=>[b.key,i]));
+
+      all.forEach(c=>{
+        const k = ymd(new Date(c.ts));
+        if(idx[k]!==undefined){
+          buckets[idx[k]][c.mood]++;
+          buckets[idx[k]].total++;
+        }
+      });
+
+      // Canvas sizing
+      const w = trendCanvas.clientWidth;
+      const h = trendCanvas.height;
+      trendCanvas.width = Math.floor(w);
+
+      // clear
+      trendCtx.clearRect(0,0,trendCanvas.width,h);
+
+      // axes area
+      const pad = 10;
+      const innerW = trendCanvas.width - pad*2;
+      const innerH = h - pad*2;
+
+      // draw baseline
+      trendCtx.globalAlpha = 1;
+      trendCtx.strokeStyle = "rgba(255,255,255,.10)";
+      trendCtx.beginPath();
+      trendCtx.moveTo(pad, pad+innerH);
+      trendCtx.lineTo(pad+innerW, pad+innerH);
+      trendCtx.stroke();
+
+      // bars
+      const barW = innerW / days;
+      buckets.forEach((b,i)=>{
+        const x0 = pad + i*barW + 2;
+        const bw = Math.max(2, barW-4);
+
+        // stack heights relative to max
+        const maxTotal = Math.max(1, ...buckets.map(x=>x.total));
+        const totalH = (b.total/maxTotal)*innerH;
+
+        // split stack by mood shares
+        const calmH = b.total ? totalH*(b.calm/b.total) : 0;
+        const heavyH = b.total ? totalH*(b.heavy/b.total) : 0;
+        const energyH = b.total ? totalH*(b.energised/b.total) : 0;
+
+        let y = pad+innerH;
+
+        // calm
+        if(calmH){
+          trendCtx.fillStyle = "rgba(34,197,94,.65)";
+          trendCtx.fillRect(x0, y-calmH, bw, calmH);
+          y -= calmH;
+        }
+        // heavy
+        if(heavyH){
+          trendCtx.fillStyle = "rgba(168,85,247,.60)";
+          trendCtx.fillRect(x0, y-heavyH, bw, heavyH);
+          y -= heavyH;
+        }
+        // energised
+        if(energyH){
+          trendCtx.fillStyle = "rgba(245,158,11,.62)";
+          trendCtx.fillRect(x0, y-energyH, bw, energyH);
+          y -= energyH;
+        }
+      });
+
+      // hint
+      const last7 = buckets.slice(-7);
+      const sum = last7.reduce((acc,b)=>{ acc.calm+=b.calm; acc.heavy+=b.heavy; acc.energised+=b.energised; acc.total+=b.total; return acc; }, {calm:0,heavy:0,energised:0,total:0});
+      if(sum.total){
+        const top = Object.keys(MOODS).sort((a,b)=> sum[b]-sum[a])[0];
+        trendHint.textContent = `Last 7 days: ${MOODS[top].emoji} ${MOODS[top].label} dominant • ${sum.total} check-ins.`;
+      } else {
+        trendHint.textContent = "Add a few check-ins — your trend line will come alive.";
+      }
+    }
+
+    /***************
+     * Streaks
+     ***************/
+    const elStreak = document.getElementById("streakCount");
+
+    function updateStreak(){
+      // streak based on consecutive days with >=1 check-in
+      const daysSet = new Set(data.checkins.map(c => ymd(new Date(c.ts))));
+      const d = new Date(); d.setHours(0,0,0,0);
+      let streak = 0;
+      while(true){
+        const key = ymd(d);
+        if(daysSet.has(key)){
+          streak++;
+          d.setDate(d.getDate()-1);
+        } else {
+          break;
+        }
+      }
+      elStreak.textContent = String(streak);
+    }
+
+    /***************
+     * Friends (ambient, not social)
+     ***************/
+    const elFriendsBadge = document.getElementById("friendsBadge");
+    const elFriendsModeLabel = document.getElementById("friendsModeLabel");
+    const elFriendsPulse = document.getElementById("friendsPulse");
+    const elFriendsVisibility = document.getElementById("friendsVisibility");
+
+    function setFriendsMode(mode){
+      data.friendsMode = mode;
+      saveData(data);
+
+      // UI chips
+      document.querySelectorAll("[data-fmode]").forEach(b=>{
+        b.classList.toggle("chipOn", b.dataset.fmode===mode);
+      });
+
+      const labels = { private:"Private", anonymous:"Anonymous", close:"Close Friends" };
+      elFriendsModeLabel.textContent = labels[mode];
+
+      // header badge
+      const badgeText = mode==="private" ? "(off)" : mode==="anonymous" ? "(anon)" : "(close)";
+      elFriendsBadge.textContent = badgeText;
+
+      updateFriendsPulse();
+      renderFriendsMarkers();
+    }
+
+    document.querySelectorAll("[data-fmode]").forEach(btn=>{
+      btn.addEventListener("click", ()=> setFriendsMode(btn.dataset.fmode));
+    });
+
+    function updateFriendsPulse(){
+      const mode = data.friendsMode;
+
+      if(mode==="private"){
+        elFriendsPulse.textContent = "Private mode: friends are disabled.";
+        elFriendsVisibility.textContent = "No one can see your presence. You won’t see anyone else either.";
+        return;
+      }
+
+      // Fake pulse numbers (for prototype feel)
+      const near = 1 + Math.floor(Math.random()*4);
+      const calm = Math.floor(Math.random()*near);
+      const heavy = Math.floor(Math.random()*(near-calm));
+      const energised = Math.max(0, near - calm - heavy);
+
+      if(mode==="anonymous"){
+        elFriendsPulse.textContent = `${near} anonymous presence signals nearby • Calm ${calm}, Heavy ${heavy}, Energised ${energised}.`;
+        elFriendsVisibility.textContent = "Others see: “someone is nearby” (no name, no timestamp).";
+      } else {
+        elFriendsPulse.textContent = `${near} close friend${near===1?"":"s"} nearby • One recently felt calm within 500m.`;
+        elFriendsVisibility.textContent = "Close friends see: your approximate presence (no posts, no feed, no likes).";
+      }
+    }
+
+    function renderFriendsMarkers(){
+      friendsLayer.clearLayers();
+      if(data.friendsMode==="private") return;
+
+      // Add a couple of ambient dots (not identities)
+      const center = map.getCenter();
+      const count = data.friendsMode==="close" ? 2 : 3;
+
+      for(let i=0;i<count;i++){
+        const lat = center.lat + (Math.random()-0.5)*0.01;
+        const lng = center.lng + (Math.random()-0.5)*0.01;
+        L.circleMarker([lat,lng],{
+          radius: 5,
+          weight: 1,
+          color: "rgba(255,255,255,.55)",
+          fillColor: data.friendsMode==="anonymous" ? "rgba(34,197,94,.35)" : "rgba(56,189,248,.40)",
+          fillOpacity: 0.9
+        }).addTo(friendsLayer);
+      }
+    }
+
+    /***************
+     * Vibe layer toggle
+     ***************/
+    const vibeBtn = document.getElementById("toggleVibeLayer");
+    const vibeOnBadge = document.getElementById("vibeOnBadge");
+
+    function setVibeLayer(on){
+      data.vibeLayerOn = on;
+      saveData(data);
+      vibeOnBadge.textContent = on ? "(on)" : "(off)";
+      vibeBtn.classList.toggle("chipOn", on);
+      drawVibeLayer();
+    }
+
+    vibeBtn.addEventListener("click", ()=>{
+      setVibeLayer(!data.vibeLayerOn);
+    });
+
+    /***************
+     * Add venue mode (tap on map)
+     ***************/
+    const addVenueBtn = document.getElementById("addVenueMode");
+
+    function setAddVenueMode(on){
+      addVenueActive = on;
+      addVenueBtn.classList.toggle("chipOn", on);
+      addVenueBtn.textContent = on ? "✅ Tap map to place" : "➕ Add venue";
+    }
+
+    addVenueBtn.addEventListener("click", ()=> setAddVenueMode(!addVenueActive));
+
+    map.on("click", (e)=>{
+      if(!addVenueActive) return;
+
+      const name = prompt("Venue name?");
+      if(!name) return;
+      const type = prompt("Type (e.g., Beach / Walk, Gym, Cafe…)", "Place") || "Place";
+
+      const venue = {
+        id: crypto.randomUUID(),
+        name,
+        type,
+        lat: e.latlng.lat,
+        lng: e.latlng.lng
+      };
+      data.venues.push(venue);
+      saveData(data);
+
+      renderVenues();
+      selectVenue(venue.id);
+      setAddVenueMode(false);
+    });
+
+    /***************
+     * Center / geolocation
+     ***************/
+    document.getElementById("centerMe").addEventListener("click", ()=>{
+      if(!navigator.geolocation){
+        alert("Geolocation not supported.");
+        return;
+      }
+      navigator.geolocation.getCurrentPosition((pos)=>{
+        const { latitude, longitude } = pos.coords;
+        map.setView([latitude, longitude], 15, { animate:true });
+        renderFriendsMarkers();
+        drawVibeLayer();
+      }, ()=>{
+        alert("Couldn’t access location. Check iPhone permissions.");
+      }, { enableHighAccuracy:true, timeout: 8000 });
+    });
+
+    /***************
+     * Export / Reset
+     ***************/
+    document.getElementById("exportData").addEventListener("click", ()=>{
+      const blob = new Blob([JSON.stringify(data,null,2)], { type:"application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "moodspace-data.json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    document.getElementById("resetData").addEventListener("click", ()=>{
+      if(!confirm("Reset all MoodSpace data on this device?")) return;
+      localStorage.removeItem(LS_KEY);
+      data = loadData(); // reload seed
+      renderVenues();
+      selectedVenueId = null;
+      pendingMood = null;
+      updateVenueCard();
+      updateAllStats();
+      updateStreak();
+      setVibeLayer(data.vibeLayerOn);
+      setFriendsMode(data.friendsMode);
+      resizeVibeCanvas();
+      document.getElementById("reflection").value = "";
+      document.querySelectorAll(".btnMood").forEach(b=> b.classList.remove("chipOn"));
+      elCheckinStatus.textContent = "Select a venue to check in.";
+    });
+
+    /***************
+     * Header Friends toggle cycles modes
+     ***************/
+    document.getElementById("toggleFriends").addEventListener("click", ()=>{
+      const m = data.friendsMode;
+      const next = (m==="close") ? "anonymous" : (m==="anonymous") ? "private" : "close";
+      setFriendsMode(next);
+    });
+
+    /***************
+     * Init
+     ***************/
+    function initDeviceNote(){
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+      document.getElementById("deviceNote").textContent =
+        isStandalone
+          ? "✅ Running as an installed app (standalone)."
+          : "Tip: Add to Home Screen to make it feel like a real app.";
+    }
+
+    function init(){
+      updateVenueCard();
+      updateAllStats();
+      updateStreak();
+      setVibeLayer(data.vibeLayerOn);
+      setFriendsMode(data.friendsMode);
+      initDeviceNote();
+      renderFriendsMarkers();
+      resizeVibeCanvas();
+    }
+
+    init();
+  </script>
 </body>
 </html>
