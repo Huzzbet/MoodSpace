@@ -1,10 +1,12 @@
 {
-  "name": "MoodSpace 🌍",
+  "name": "MoodSpace",
   "short_name": "MoodSpace",
-  "start_url": ".",
+  "description": "Arrive. Reflect. Record. Your emotional map of places.",
+  "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#007bff",
-  "theme_color": "#007bff",
+  "background_color": "#070a14",
+  "theme_color": "#0b1022",
+  "orientation": "portrait",
   "icons": [
     {
       "src": "icons/icon-192.png",
