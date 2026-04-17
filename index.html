@@ -15,41 +15,60 @@
   --line:rgba(255,255,255,.08);
   --text:rgba(255,255,255,.92);
   --muted:rgba(255,255,255,.6);
-  --calm:#22c55e;
-  --heavy:#a855f7;
-  --energy:#f59e0b;
 }
+
 body{
   background: radial-gradient(circle at top, rgba(99,102,241,.25), transparent 40%), #070a14;
   color:var(--text);
 }
+
 .glass{
   background:rgba(255,255,255,.05);
   border:1px solid var(--line);
   backdrop-filter:blur(12px);
 }
+
 .pill{
   border:1px solid var(--line);
   background:rgba(255,255,255,.06);
 }
+
 .chipOn{
   background:rgba(99,102,241,.25);
   border-color:rgba(99,102,241,.7);
 }
-#map{ height:320px; border-radius:16px; }
+
+#map{
+  height:300px;
+  border-radius:20px;
+  overflow:hidden;
+  box-shadow:0 20px 50px rgba(0,0,0,.5);
+}
+
+.fade{
+  transition: opacity 0.5s ease;
+}
 </style>
 </head>
 
 <body class="p-4 max-w-4xl mx-auto space-y-4">
 
 <!-- Onboarding -->
-<div id="onboard" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 hidden">
-  <div class="glass p-6 rounded-xl text-center max-w-sm">
-    <h2 class="text-xl font-semibold">Welcome to MoodSpace 🌍</h2>
-    <p class="text-sm mt-2 text-gray-300">
-      Tap a location → log your mood → build your emotional map
-    </p>
-    <button id="startBtn" class="mt-4 px-4 py-2 bg-indigo-500/30 rounded-lg">
+<div id="onboard" class="fixed inset-0 flex items-center justify-center z-50 hidden">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+
+  <div class="relative glass rounded-2xl px-6 py-7 text-center max-w-sm w-[90%] shadow-2xl">
+    <div class="text-2xl font-semibold">MoodSpace 🌍</div>
+    <div class="text-sm mt-3 text-gray-300">
+      Track how places make you feel.<br/>Build your emotional map.
+    </div>
+
+    <div class="mt-4 text-xs text-gray-400">
+      Tap map → choose mood → save
+    </div>
+
+    <button id="startBtn"
+      class="mt-6 w-full py-3 rounded-xl bg-indigo-500/30 border border-indigo-300/30 hover:bg-indigo-500/40 transition">
       Get Started
     </button>
   </div>
@@ -57,33 +76,36 @@ body{
 
 <header class="text-center">
   <h1 class="text-3xl font-semibold">MoodSpace 🌍</h1>
-  <p class="text-sm text-gray-400">Track how places make you feel</p>
+  <p class="text-sm text-gray-400">Your emotional map</p>
 </header>
 
 <div id="map"></div>
 
 <div class="glass p-4 rounded-xl">
-  <h2 class="font-semibold mb-2">How do you feel?</h2>
+  <h2 class="font-semibold mb-2">How do you feel here?</h2>
+
   <div class="flex gap-2">
     <button class="mood pill px-3 py-2 rounded" data-mood="calm">😊 Calm</button>
     <button class="mood pill px-3 py-2 rounded" data-mood="heavy">😮‍💨 Heavy</button>
     <button class="mood pill px-3 py-2 rounded" data-mood="energised">⚡ Energised</button>
   </div>
 
-  <textarea id="note" class="w-full mt-3 p-2 rounded bg-black/30 border border-white/10"
+  <textarea id="note"
+    class="w-full mt-3 p-2 rounded bg-black/30 border border-white/10"
     placeholder="Optional reflection..."></textarea>
 
-  <button id="save" class="mt-3 px-4 py-2 bg-indigo-500/30 rounded">
+  <button id="save"
+    class="mt-3 px-4 py-2 bg-indigo-500/30 rounded hover:bg-indigo-500/40 transition">
     Save Check-in
   </button>
 
-  <div id="status" class="text-sm mt-2 text-gray-400"></div>
+  <div id="status" class="text-sm mt-2 text-gray-400 fade"></div>
 </div>
 
 <div class="glass p-4 rounded-xl">
   <h2 class="font-semibold">Your Insight</h2>
   <p id="insight" class="text-sm text-gray-300 mt-2">
-    Log your first mood to unlock insights
+    Log your first mood — you'll start seeing patterns instantly 🌿
   </p>
 </div>
 
@@ -94,10 +116,10 @@ body{
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-const LS = "moodspace_v2";
+const LS = "moodspace_v3";
+
 let state = JSON.parse(localStorage.getItem(LS)) || {
-  checkins: [],
-  venues: []
+  checkins: []
 };
 
 let selected = null;
@@ -109,11 +131,13 @@ L.tileLayer(
  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
 ).addTo(map);
 
+// select location
 map.on("click", e=>{
   selected = e.latlng;
   L.marker(e.latlng).addTo(map);
 });
 
+// mood selection
 document.querySelectorAll(".mood").forEach(btn=>{
   btn.onclick=()=>{
     mood = btn.dataset.mood;
@@ -122,9 +146,10 @@ document.querySelectorAll(".mood").forEach(btn=>{
   }
 });
 
+// save checkin
 document.getElementById("save").onclick=()=>{
   if(!selected || !mood){
-    document.getElementById("status").textContent="Tap map + select mood";
+    setStatus("Tap map + select mood");
     return;
   }
 
@@ -138,24 +163,43 @@ document.getElementById("save").onclick=()=>{
 
   localStorage.setItem(LS, JSON.stringify(state));
 
-  document.getElementById("status").textContent="Saved ✅ +1 to your streak";
+  document.getElementById("note").value="";
+  document.querySelectorAll(".mood").forEach(b=>b.classList.remove("chipOn"));
+  mood=null;
 
+  setStatus("Saved ✅ +1 to your streak");
   updateInsights();
 };
 
+// status UI
+function setStatus(text){
+  const el = document.getElementById("status");
+  el.textContent = text;
+  el.style.opacity = 1;
+
+  setTimeout(()=>{ el.style.opacity = 0.6; },1500);
+}
+
+// insights
 function updateInsights(){
-  if(state.checkins.length<3){
-    document.getElementById("insight").textContent="Keep logging to unlock patterns";
+  const data = state.checkins;
+
+  if(data.length < 3){
+    document.getElementById("insight").textContent =
+      "Keep logging — your emotional patterns are forming";
     return;
   }
 
-  const calm = state.checkins.filter(c=>c.mood==="calm").length;
-  const total = state.checkins.length;
+  const counts = { calm:0, heavy:0, energised:0 };
+  data.forEach(c=>counts[c.mood]++);
 
-  const pct = Math.round((calm/total)*100);
+  const total = data.length;
+  const top = Object.keys(counts).sort((a,b)=>counts[b]-counts[a])[0];
+
+  const pct = Math.round((counts[top]/total)*100);
 
   document.getElementById("insight").textContent =
-    `You feel calm ${pct}% of the time 🌿`;
+    `You feel ${top} ${pct}% of the time here 🌿`;
 }
 
 updateInsights();
@@ -164,6 +208,7 @@ updateInsights();
 if(!localStorage.getItem("seen")){
   document.getElementById("onboard").classList.remove("hidden");
 }
+
 document.getElementById("startBtn").onclick=()=>{
   document.getElementById("onboard").classList.add("hidden");
   localStorage.setItem("seen",1);
